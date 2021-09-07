@@ -46,8 +46,8 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     }
 
     struct Condition {
-        uint256 requiredSAT;            // mininum  SAT amount for Buy or Bid 
-                                        // 0 SAT, 500 MIL SAT, 1B SAT, 50B SAT, 100B SAT, 500B SAT (0 SAT: not required)
+        uint256 requiredAKA;            // mininum  AKA amount for Buy or Bid 
+                                        // 0 AKA, 500 MIL AKA, 1B AKA, 50B AKA, 100B AKA, 500B AKA (0 AKA: not required)
         bool forOnlyV1Holder;           // Only V1 NFT holder can buy or bid
         uint256 v1HolderDiscount;       // Discount percentage for V1 Holder
     }
@@ -67,10 +67,9 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     struct Info {
         address feeAddress1;
         address feeAddress2;
-        address v1NFTAddress;
-        address satTokenAddress;
+        address akaTokenAddress;
 
-        uint256 minSatToCreate;   // Min amount to create NFT
+        uint256 minAkaToCreate;   // Min amount to create NFT
 
         uint256 royalty;   // default 1%
         uint256 adminFee1;  // default 0.85%
@@ -88,7 +87,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     event ItemSold(address buyer , uint256 tokenID, uint256 itemId, uint256 amount);
     event UpdatedSupportCurrency(address currency , bool acceptable);
 
-    constructor (address _v1NFT, address _aka, address _fee1, address _fee2) ERC721("paw NFT" , "PAWNFT"){
+    constructor (address _aka, address _fee1, address _fee2) ERC721("paw NFT" , "PAWNFT"){
         info.royalty = 100;
         info.adminFee1 = 85;
         info.adminFee2 = 15;
@@ -100,9 +99,8 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         
         info.feeAddress1 = _fee1;
         info.feeAddress2 = _fee2;
-        info.v1NFTAddress = _v1NFT;
-        info.satTokenAddress = _aka;
-        info.minSatToCreate = 5e8;
+        info.akaTokenAddress = _aka;
+        info.minAkaToCreate = 5e8;
 
         isAdmin[_msgSender()] = true;
     }
@@ -132,7 +130,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredSAT,
+        uint256 _requiredAKA,
         bool _forOnlyV1Holder,
         uint256 _v1HolderDiscount
     ) external returns (uint256) {
@@ -140,7 +138,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         require(_price > 0, "invalid price");
         require(isSupportedToken(_currency), "invalid payment currency");
         require(_v1HolderDiscount < PERCENTS_DIVIDER, "too big discount");
-        require(info.minSatToCreate <= IERC20(info.satTokenAddress).balanceOf(_msgSender()), "insufficient $Sat Balance");
+        require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
 
         
         _itemIds.increment();
@@ -149,7 +147,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         
         {
             Condition memory _condition;
-            _condition.requiredSAT = _requiredSAT;
+            _condition.requiredAKA = _requiredAKA;
             _condition.forOnlyV1Holder = isAdmin[_msgSender()] ? _forOnlyV1Holder : false;
             _condition.v1HolderDiscount = isAdmin[_msgSender()] ? _v1HolderDiscount : 0;
 
@@ -180,7 +178,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredSAT,
+        uint256 _requiredAKA,
         bool _forOnlyV1Holder,
         uint256 _v1HolderDiscount
     ) external returns (uint256) {
@@ -188,7 +186,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         require(isSupportedToken(_currency), "invalid payment currency");
         require(ERC721(_collection).ownerOf(_tokenId) == _msgSender(), "not owner");
         require(_v1HolderDiscount < PERCENTS_DIVIDER, "too big discount");
-        require(info.minSatToCreate <= IERC20(info.satTokenAddress).balanceOf(_msgSender()), "insufficient $Sat Balance");
+        require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
 
 
         _itemIds.increment();
@@ -197,7 +195,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         
         {
             Condition memory _condition;
-            _condition.requiredSAT = _requiredSAT;
+            _condition.requiredAKA = _requiredAKA;
             _condition.forOnlyV1Holder = isAdmin[_msgSender()] ? _forOnlyV1Holder : false;
             _condition.v1HolderDiscount = isAdmin[_msgSender()] ? _v1HolderDiscount : 0;
 
@@ -404,9 +402,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         }
 
         require(item.creator == _msgSender()
-            || item.condition.requiredSAT <= IERC20(info.satTokenAddress).balanceOf(_msgSender()), "insufficient $SAT Balance");
-        require(!item.condition.forOnlyV1Holder 
-            || IERC721(info.v1NFTAddress).balanceOf(_msgSender()) > 0, "require V1 NFT token");
+            || item.condition.requiredAKA <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $AKA Balance");
     }
 
     function _processPayment(uint256 _id, address buyer, uint256 _amount) internal {
@@ -472,11 +468,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
 
     function calcBidAmount(uint256 _id, address _account, uint256 _amount) internal view returns (uint256) {
         Item memory item =  items[_id];
-        if(IERC721(info.v1NFTAddress).balanceOf(_account) > 0 && item.condition.v1HolderDiscount > 0) {
-            return _amount.mul(PERCENTS_DIVIDER.sub(item.condition.v1HolderDiscount)).div(PERCENTS_DIVIDER);
-        } else {
-            return _amount;
-        }
+        return _amount;
     }
 
     function lastBid(uint256 _id) public view returns(address, uint256, bool) {
@@ -545,18 +537,14 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         info.royalty = _royalty;
 	}
 
-    function setV1TokenAddress(address _address) external onlyOwner {
+
+    function setAKAAddress(address _address) external onlyOwner {
 		require(_address != address(0x0), "invalid address");
-        info.v1NFTAddress = _address;
+        info.akaTokenAddress = _address;
     }
 
-    function setSATAddress(address _address) external onlyOwner {
-		require(_address != address(0x0), "invalid address");
-        info.satTokenAddress = _address;
-    }
-
-    function setMinSatToCreate(uint256 _amount) external onlyOwner {
-		info.minSatToCreate = _amount;
+    function setminAkaToCreate(uint256 _amount) external onlyOwner {
+		info.minAkaToCreate = _amount;
     }
 
     function addAdmin(address adminAddress) public onlyOwner {
