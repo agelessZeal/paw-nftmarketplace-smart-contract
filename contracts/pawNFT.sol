@@ -48,8 +48,6 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     struct Condition {
         uint256 requiredAKA;            // mininum  AKA amount for Buy or Bid 
                                         // 0 AKA, 500 MIL AKA, 1B AKA, 50B AKA, 100B AKA, 500B AKA (0 AKA: not required)
-        bool forOnlyV1Holder;           // Only V1 NFT holder can buy or bid
-        uint256 v1HolderDiscount;       // Discount percentage for V1 Holder
     }
 
     struct Bid {
@@ -130,14 +128,11 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredAKA,
-        bool _forOnlyV1Holder,
-        uint256 _v1HolderDiscount
+        uint256 _requiredAKA
     ) external returns (uint256) {
         require(!_auctionable || _count == 1, "can mint only 1 for auctionable item");
         require(_price > 0, "invalid price");
         require(isSupportedToken(_currency), "invalid payment currency");
-        require(_v1HolderDiscount < PERCENTS_DIVIDER, "too big discount");
         require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
 
         
@@ -148,8 +143,6 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         {
             Condition memory _condition;
             _condition.requiredAKA = _requiredAKA;
-            _condition.forOnlyV1Holder = isAdmin[_msgSender()] ? _forOnlyV1Holder : false;
-            _condition.v1HolderDiscount = isAdmin[_msgSender()] ? _v1HolderDiscount : 0;
 
             item.id = currentId;
             item.collection = address(this);
@@ -178,14 +171,11 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredAKA,
-        bool _forOnlyV1Holder,
-        uint256 _v1HolderDiscount
+        uint256 _requiredAKA
     ) external returns (uint256) {
         require(_price > 0, "invalid price");
         require(isSupportedToken(_currency), "invalid payment currency");
         require(ERC721(_collection).ownerOf(_tokenId) == _msgSender(), "not owner");
-        require(_v1HolderDiscount < PERCENTS_DIVIDER, "too big discount");
         require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
 
 
@@ -196,8 +186,6 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         {
             Condition memory _condition;
             _condition.requiredAKA = _requiredAKA;
-            _condition.forOnlyV1Holder = isAdmin[_msgSender()] ? _forOnlyV1Holder : false;
-            _condition.v1HolderDiscount = isAdmin[_msgSender()] ? _v1HolderDiscount : 0;
 
             item.id = currentId;
             item.collection = _collection;
@@ -225,7 +213,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         _checkCanBuy(_id);
 
         Item storage item = items[_id];
-        uint256 _amountToPay = calcBidAmount(_id, _msgSender(), _amount);
+        uint256 _amountToPay = _amount;
 
         require(!item.auctionable, "Auctionable sales dont allow outright purchase, place a bid");
         require(_amount == items[_id].price, "Amount below asking price");
@@ -265,7 +253,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
 
         Item storage item = items[_id];
         (, uint256 amount ,) = lastBid(_id);
-        uint256 _amountToPay = calcBidAmount(_id, _msgSender(), _amount);
+        uint256 _amountToPay = _amount;
 
         require(item.auctionable , "Not an auctionable sale, purchasse outrightly");
         require(item.currency != address(0x0) || _amount == _amountToPay, "invalid eth value");
@@ -352,7 +340,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
 
             address buyer = _lastBid.bidder;
             // Process the payment
-            uint256 amountToPay = calcBidAmount(_id, _lastBid.bidder, _lastBid.amount);
+            uint256 amountToPay = _lastBid.amount;
             _processPayment(_id, address(this),amountToPay);
 
             uint256 tokenId;
@@ -408,7 +396,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     function _processPayment(uint256 _id, address buyer, uint256 _amount) internal {
         Item memory item = items[_id];
         
-        uint256 _total = calcBidAmount(_id, buyer, _amount);
+        uint256 _total = _amount;
         uint256 _commissionValue1 = _total.mul(info.adminFee1).div(PERCENTS_DIVIDER);
         uint256 _commissionValue2 = _total.mul(info.adminFee2).div(PERCENTS_DIVIDER);
         uint256 _royalties = _total.mul(item.collection == address(this) && _creators[item.tokenId] != address(0x0) ? info.royalty : 0).div(PERCENTS_DIVIDER);
@@ -448,7 +436,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
             Bid storage _lastBid = itemBids[_id][bidsLength - 1];
 
             if (_lastBid.isActive && _lastBid.amount > 0 && _lastBid.bidder != address(0)) {
-                uint256 amountToRefund = calcBidAmount(_id, _lastBid.bidder,  _lastBid.amount);
+                uint256 amountToRefund = _lastBid.amount;
                 _payoutUser(_lastBid.bidder, item.currency, amountToRefund);
                 _lastBid.isActive = false;
             } 
@@ -464,11 +452,6 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         }else {
             IERC20(_currency).transfer(_recipient , _amount);
         }
-    }
-
-    function calcBidAmount(uint256 _id, address _account, uint256 _amount) internal view returns (uint256) {
-        Item memory item =  items[_id];
-        return _amount;
     }
 
     function lastBid(uint256 _id) public view returns(address, uint256, bool) {
