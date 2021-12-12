@@ -5,33 +5,44 @@ const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay * 10
 async function main () {
   const ethers = hre.ethers
 
+  const {parseEther, formatEther} = ethers.utils;
+
   console.log('network:', await ethers.provider.getNetwork())
 
   const signer = (await ethers.getSigners())[0]
   console.log('signer:', await signer.getAddress())
 
+  const deployer = new ethers.Wallet(process.env.PRIVATE_KEY, ethers.provider)
 
-  const v1NFT = '0x4686D37c7e074bf85A3A1715652aD9D18Ab8c527'
-  const SAT = '0x5492F627492f65c81C63353D774eAf6CE8514C29'
-  const fee = '0xc2A79DdAF7e95C141C20aa1B10F3411540562FF7'
+  console.log('deployer:',deployer.address, formatEther(await deployer.getBalance()));
+
+  const VXLToken = await ethers.getContractFactory("VXLToken", deployer);
+
+  const vxlerc = await VXLToken.deploy();
+  await vxlerc.deployed();
+
+  console.log("vxl erc token Contract deployed to ", vxlerc.address)
+
+
+  const SAT = '0x2d97A45D32669bC5a043eC8D33C40fF7858D3607'
+  const fee = '0x98911a83795099e63608600788bBE777D7e71E0A'
 
   /**
    *  Deploy Altura Faucet
    */
-  const pawNFT = await ethers.getContractFactory('pawNFT', {
-    signer: (await ethers.getSigners())[0]
-  })
+  const VXLNFT = await ethers.getContractFactory('VXLNFT', deployer)
 
-  const contract = await pawNFT.deploy(v1NFT, SAT, fee);
+
+  const contract = await VXLNFT.deploy(vxlerc.address, SAT, fee);
   await contract.deployed()
 
   console.log('contract deployed to:', contract.address)
   
-  await sleep(20);
+  await sleep(60);
   await hre.run("verify:verify", {
     address: contract.address,
-    contract: "contracts/pawNFT.sol:pawNFT",
-    constructorArguments: [v1NFT, SAT, fee],
+    contract: "contracts/VXLNFT.sol:VXLNFT",
+    constructorArguments: [vxlerc.address, SAT, fee],
   })
 
   console.log('contract verified')

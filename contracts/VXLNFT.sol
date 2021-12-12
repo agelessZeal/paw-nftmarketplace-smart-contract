@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Ownable, ReentrancyGuard {
+contract VXLNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Ownable, ReentrancyGuard {
     using Counters for Counters.Counter;
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -46,8 +46,8 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     }
 
     struct Condition {
-        uint256 requiredAKA;            // mininum  AKA amount for Buy or Bid 
-                                        // 0 AKA, 500 MIL AKA, 1B AKA, 50B AKA, 100B AKA, 500B AKA (0 AKA: not required)
+        uint256 requiredVXL;            // mininum  VXL amount for Buy or Bid 
+                                        // 0 VXL, 500 MIL VXL, 1B VXL, 50B VXL, 100B VXL, 500B VXL (0 VXL: not required)
     }
 
     struct Bid {
@@ -65,9 +65,9 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     struct Info {
         address feeAddress1;
         address feeAddress2;
-        address akaTokenAddress;
+        address vxlTokenAddress;
 
-        uint256 minAkaToCreate;   // Min amount to create NFT
+        uint256 minVXLToCreate;   // Min amount to create NFT
 
         uint256 royalty;   // default 1%
         uint256 adminFee1;  // default 0.85%
@@ -85,20 +85,20 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
     event ItemSold(address buyer , uint256 tokenID, uint256 itemId, uint256 amount);
     event UpdatedSupportCurrency(address currency , bool acceptable);
 
-    constructor (address _aka, address _fee1, address _fee2) ERC721("paw NFT" , "PAWNFT"){
+    constructor (address _vxl, address _fee1, address _fee2) ERC721("VXL" , "VXL"){
         info.royalty = 100;
         info.adminFee1 = 85;
         info.adminFee2 = 15;
 
         {
             addSupportedToken(address(0x0));  // ETH
-            addSupportedToken(_aka); // AKA
+            addSupportedToken(_vxl); // VXL
         }
         
         info.feeAddress1 = _fee1;
         info.feeAddress2 = _fee2;
-        info.akaTokenAddress = _aka;
-        info.minAkaToCreate = 5e8;
+        info.vxlTokenAddress = _vxl;
+        info.minVXLToCreate = 5e8;
 
         isAdmin[_msgSender()] = true;
     }
@@ -128,12 +128,12 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredAKA
+        uint256 _requiredVXL
     ) external returns (uint256) {
         require(!_auctionable || _count == 1, "can mint only 1 for auctionable item");
         require(_price > 0, "invalid price");
         require(isSupportedToken(_currency), "invalid payment currency");
-        require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
+        require(info.minVXLToCreate <= IERC20(info.vxlTokenAddress).balanceOf(_msgSender()), "insufficient $VXL Balance");
 
         
         _itemIds.increment();
@@ -142,7 +142,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         
         {
             Condition memory _condition;
-            _condition.requiredAKA = _requiredAKA;
+            _condition.requiredVXL = _requiredVXL;
 
             item.id = currentId;
             item.collection = address(this);
@@ -171,12 +171,12 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         uint256 _startTime,
         uint256 _endTime,
         address _currency,
-        uint256 _requiredAKA
+        uint256 _requiredVXL
     ) external returns (uint256) {
         require(_price > 0, "invalid price");
         require(isSupportedToken(_currency), "invalid payment currency");
         require(ERC721(_collection).ownerOf(_tokenId) == _msgSender(), "not owner");
-        require(info.minAkaToCreate <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $Aka Balance");
+        require(info.minVXLToCreate <= IERC20(info.vxlTokenAddress).balanceOf(_msgSender()), "insufficient $VXL Balance");
 
 
         _itemIds.increment();
@@ -185,7 +185,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         
         {
             Condition memory _condition;
-            _condition.requiredAKA = _requiredAKA;
+            _condition.requiredVXL = _requiredVXL;
 
             item.id = currentId;
             item.collection = _collection;
@@ -390,7 +390,7 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
         }
 
         require(item.creator == _msgSender()
-            || item.condition.requiredAKA <= IERC20(info.akaTokenAddress).balanceOf(_msgSender()), "insufficient $AKA Balance");
+            || item.condition.requiredVXL <= IERC20(info.vxlTokenAddress).balanceOf(_msgSender()), "insufficient $VXL Balance");
     }
 
     function _processPayment(uint256 _id, address buyer, uint256 _amount) internal {
@@ -521,13 +521,13 @@ contract pawNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Holder, Own
 	}
 
 
-    function setAKAAddress(address _address) external onlyOwner {
+    function setVXLAddress(address _address) external onlyOwner {
 		require(_address != address(0x0), "invalid address");
-        info.akaTokenAddress = _address;
+        info.vxlTokenAddress = _address;
     }
 
-    function setminAkaToCreate(uint256 _amount) external onlyOwner {
-		info.minAkaToCreate = _amount;
+    function setminVXLToCreate(uint256 _amount) external onlyOwner {
+		info.minVXLToCreate = _amount;
     }
 
     function addAdmin(address adminAddress) public onlyOwner {
